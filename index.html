@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IpNeo • Real IP Detector</title>
+
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3299034064102978"
+     crossorigin="anonymous"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&display=swap');
+    
+    body { 
+      background: linear-gradient(135deg, #0f172a, #1e2937); 
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .ip-box { 
+      background: #0f172a; 
+      border: 3px solid #22c55e; 
+      box-shadow: 0 0 40px rgba(34, 197, 94, 0.3);
+      overflow: hidden;
+    }
+    .map-container { 
+      height: 380px; 
+      border-radius: 16px; 
+      overflow: hidden; 
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.35); 
+      background: #111;
+    }
+    #ipv4 {
+      font-size: clamp(1.8rem, 7.5vw, 4rem);
+      line-height: 1.05;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      word-break: break-all;
+      display: block;
+    }
+    .modal { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+  </style>
+</head>
+<body class="text-white min-h-screen">
+
+<div id="tosModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+  <div class="modal bg-[#1e2937] rounded-3xl max-w-md w-11/12 mx-4 p-8 text-center shadow-2xl border border-white/10">
+    <div class="text-5xl mb-6">📜</div>
+    <h2 class="text-3xl font-bold mb-3">Welcome to IpNeo</h2>
+    <p class="text-gray-300 mb-8 text-lg">Accept the Terms of Service to continue</p>
+    
+    <div class="flex flex-col gap-5">
+      <button onclick="showTerms()" class="bg-gray-700 hover:bg-gray-600 py-4 rounded-2xl font-medium text-lg transition">
+        📖 View Terms
+      </button>
+      <button onclick="acceptTOS()" class="bg-emerald-500 hover:bg-emerald-600 text-black py-5 rounded-2xl font-bold text-xl transition">
+        ✅ Accept & Continue
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="termsModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 hidden">
+  <div class="modal bg-[#1e2937] rounded-3xl max-w-2xl w-11/12 mx-4 p-8 shadow-2xl border border-white/10">
+    <h2 class="text-3xl font-bold mb-6 text-center">IpNeo Terms of Service</h2>
+    <div class="text-sm leading-relaxed text-gray-300 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+      <p><strong>Last updated:</strong> March 2026</p>
+      <p>1. Free real-time IP lookup tool.</p>
+      <p>2. No logging or storing of data.</p>
+      <p>3. Accuracy from public APIs only.</p>
+      <p>4. 13+ years old required.</p>
+      <p>5. No illegal use.</p>
+      <p>6. Use at your own risk.</p>
+    </div>
+    <div class="flex gap-4 mt-8">
+      <button onclick="hideTerms()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-2xl font-medium">Back</button>
+      <button onclick="acceptTOS()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black py-4 rounded-2xl font-bold">Accept</button>
+    </div>
+  </div>
+</div>
+
+<div id="mainContent" class="max-w-5xl mx-auto px-4 sm:px-6 py-10 hidden">
+  <div class="text-center mb-10">
+    <h1 class="text-6xl sm:text-7xl font-extrabold tracking-tight text-emerald-400">IpNeo</h1>
+    <p class="text-gray-400 mt-2 text-lg sm:text-xl">Real IP Detector</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+    <div class="ip-box rounded-3xl p-8 sm:p-12 text-center flex flex-col justify-center">
+      <div id="status" class="text-emerald-400 text-sm sm:text-base font-medium tracking-wider mb-6">
+        DETECTING YOUR IP...
+      </div>
+      <div id="ipv4" class="font-mono text-white mx-auto">••••••••</div>
+    </div>
+
+    <div class="bg-[#1e2937] rounded-3xl p-6 sm:p-8">
+      <div class="flex justify-between items-center mb-6">
+        <span class="text-emerald-400 font-bold text-lg sm:text-xl">📍 Your Location</span>
+        <span class="text-xs bg-emerald-900 px-4 py-2 rounded-full">High Accuracy</span>
+      </div>
+      <div id="map" class="map-container"></div>
+    </div>
+  </div>
+
+  <div class="mt-10 sm:mt-12 text-center">
+    <button onclick="refreshIP()" 
+            class="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-10 sm:px-16 py-5 sm:py-6 rounded-2xl text-xl sm:text-2xl transition-all active:scale-95 shadow-lg">
+      🔄 Refresh
+    </button>
+  </div>
+</div>
+
+<script>
+  let mapInstance = null;
+
+  function checkTOS() {
+    if (localStorage.getItem('ipneoTOSAccepted') === 'true') {
+      document.getElementById('tosModal').classList.add('hidden');
+      document.getElementById('mainContent').classList.remove('hidden');
+      fetchIP();
+    }
+  }
+
+  function acceptTOS() {
+    localStorage.setItem('ipneoTOSAccepted', 'true');
+    document.getElementById('tosModal').classList.add('hidden');
+    document.getElementById('termsModal').classList.add('hidden');
+    document.getElementById('mainContent').classList.remove('hidden');
+    fetchIP();
+  }
+
+  function showTerms() {
+    document.getElementById('tosModal').classList.add('hidden');
+    document.getElementById('termsModal').classList.remove('hidden');
+  }
+
+  function hideTerms() {
+    document.getElementById('termsModal').classList.add('hidden');
+    document.getElementById('tosModal').classList.remove('hidden');
+  }
+
+  async function fetchIP() {
+    const ipEl = document.getElementById('ipv4');
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = "DETECTING YOUR IP...";
+    ipEl.textContent = "••••••••";
+
+    try {
+      const res = await fetch('https://ipwho.is/');
+      const data = await res.json();
+      if (data.success) {
+        updateUI(data.ip, data.latitude, data.longitude, data.city);
+        return;
+      }
+    } catch (e) { console.warn("Primary API failed..."); }
+
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      const data = await res.json();
+      if (data.ip) {
+        updateUI(data.ip, data.latitude, data.longitude, data.city);
+        return;
+      }
+    } catch (e) { console.warn("Fallback API failed..."); }
+
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      if (data.ip) {
+        ipEl.textContent = data.ip;
+        statusEl.textContent = "IP DETECTED (LIMIT REACHED)";
+        return;
+      }
+    } catch (e) { console.error("All APIs failed."); }
+
+    statusEl.textContent = "COULD NOT DETECT IP";
+    ipEl.textContent = "Refresh to try again";
+  }
+
+  function updateUI(ip, lat, lon, city) {
+    document.getElementById('ipv4').textContent = ip;
+    document.getElementById('status').textContent = "DETECTED SUCCESSFULLY";
+    loadMap(lat, lon, city || "Your Location");
+  }
+
+  function loadMap(lat, lon, city) {
+    if (mapInstance) mapInstance.remove();
+    mapInstance = L.map('map').setView([lat, lon], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; CartoDB'
+    }).addTo(mapInstance);
+
+    L.circleMarker([lat, lon], {
+      radius: 10,
+      fillColor: "#22c55e",
+      color: "#fff",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(mapInstance).bindPopup(`<b>${city}</b>`).openPopup();
+
+    setTimeout(() => { mapInstance.invalidateSize(); }, 200);
+  }
+
+  function refreshIP() {
+    fetchIP();
+  }
+
+  window.onload = checkTOS;
+</script>
+</body>
+</html>
